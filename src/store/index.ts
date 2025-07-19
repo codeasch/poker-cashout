@@ -1,215 +1,204 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { 
-  AppState, 
+import { 
   Session, 
   Player, 
   BuyIn, 
   CashOut, 
-  ReentryEvent,
-  SessionSettings,
-  PlayerId,
-  SessionId
+  SessionSettings, 
+  SettlementSnapshot,
+  UserSettings,
+  AppState 
 } from '../types';
-import { 
-  generateSessionId, 
-  generatePlayerId, 
-  generateBuyInId, 
-  generateCashOutId 
-} from '../utils/id';
+import { generateId } from '../utils/id';
 import { calculateSettlement } from '../utils/settlement';
-import { validateAmount } from '../utils/currency';
 
-const SCHEMA_VERSION = 1;
-
-const defaultSessionSettings: SessionSettings = {
-  varianceToleranceCents: 100, // $1.00 tolerance
-  quickBuyInOptions: [2000, 4000, 10000] // $20, $40, $100
+const DEFAULT_SETTINGS: UserSettings = {
+  currency: '$',
+  quickBuyInOptions: [2000, 4000, 10000], // $20, $40, $100 in cents
+  defaultVarianceTolerance: 100, // $1.00 in cents
+  theme: 'auto',
+  showConfirmations: true,
+  autoSave: true,
+  language: 'en'
 };
 
-interface AppStore extends AppState {
-  // Session management
-  createSession: (payload: { name: string; currency: string; settings?: Partial<SessionSettings> }) => SessionId;
-  deleteSession: (sessionId: SessionId) => void;
-  setActiveSession: (sessionId: SessionId) => void;
+const DEFAULT_SESSION_SETTINGS: SessionSettings = {
+  varianceToleranceCents: 100,
+  quickBuyInOptions: [2000, 4000, 10000]
+};
+
+export const useStore = create<AppState & {
+  // Session actions
+  createSession: (name: string, currency?: string) => void;
+  setActiveSession: (sessionId: string | null) => void;
+  deleteSession: (sessionId: string) => void;
   
-  // Player management
-  addPlayer: (sessionId: SessionId, name: string, color?: string) => PlayerId;
-  updatePlayer: (sessionId: SessionId, playerId: PlayerId, updates: Partial<Player>) => void;
-  removePlayer: (sessionId: SessionId, playerId: PlayerId) => void;
+  // Player actions
+  addPlayer: (sessionId: string, name: string, color?: string) => void;
+  removePlayer: (sessionId: string, playerId: string) => void;
   
-  // Buy-in management
-  recordBuyIn: (sessionId: SessionId, playerId: PlayerId, amountCents: number) => void;
-  undoLastBuyIn: (sessionId: SessionId) => void;
-  undoLastBuyInForPlayer: (sessionId: SessionId, playerId: PlayerId) => void;
+  // Buy-in actions
+  recordBuyIn: (sessionId: string, playerId: string, amountCents: number) => void;
+  undoLastBuyIn: (sessionId: string) => void;
+  undoLastBuyInForPlayer: (sessionId: string, playerId: string) => void;
   
-  // Cash-out management
-  cashOutPlayer: (sessionId: SessionId, playerId: PlayerId, amountCents: number, reason: 'leave' | 'final') => void;
-  editCashOut: (sessionId: SessionId, cashOutId: string, newAmountCents: number) => void;
-  rejoinPlayer: (sessionId: SessionId, playerId: PlayerId) => void;
+  // Cash-out actions
+  cashOutPlayer: (sessionId: string, playerId: string, amountCents: number, reason: 'leave' | 'final') => void;
+  rejoinPlayer: (sessionId: string, playerId: string) => void;
   
   // Session finalization
-  finalizeSession: (sessionId: SessionId, finalStacksMap: Record<PlayerId, number>) => void;
+  finalizeSession: (sessionId: string, finalStacks: Record<string, number>) => void;
+  
+  // Settings actions
+  updateSettings: (settings: Partial<UserSettings>) => void;
+  resetSettings: () => void;
   
   // Import/Export
-  exportSession: (sessionId: SessionId) => string;
-  importSessions: (json: string) => void;
+  exportData: () => string;
+  importData: (jsonData: string) => void;
   
   // Theme
-  setTheme: (theme: 'light' | 'dark') => void;
-  
-  // Utility
-  getSession: (sessionId: SessionId) => Session | undefined;
-  getActiveSession: () => Session | undefined;
-}
-
-export const useAppStore = create<AppStore>()(
+  toggleTheme: () => void;
+}>()(
   persist(
     (set, get) => ({
       sessions: {},
-      activeSessionId: undefined,
-      theme: 'dark' as const,
-      version: SCHEMA_VERSION,
+      activeSessionId: null,
+      settings: DEFAULT_SETTINGS,
 
-      createSession: (payload: { name: string; currency: string; settings?: Partial<SessionSettings> }) => {
-        const sessionId = generateSessionId();
-        const session: Session = {
+      createSession: (name: string, currency?: string) => {
+        const sessionId = generateId();
+        const settings = get().settings;
+        
+        const newSession: Session = {
           id: sessionId,
-          name: payload.name,
-          currency: payload.currency,
+          name,
+          currency: currency || settings.currency,
           createdAt: Date.now(),
           players: {},
           buyIns: [],
           cashOuts: [],
           reentries: [],
-          settings: { ...defaultSessionSettings, ...payload.settings },
+          settings: {
+            ...DEFAULT_SESSION_SETTINGS,
+            quickBuyInOptions: settings.quickBuyInOptions,
+            varianceToleranceCents: settings.defaultVarianceTolerance
+          },
           status: 'open',
-          version: SCHEMA_VERSION
+          version: 1
         };
 
         set((state) => ({
-          sessions: { ...state.sessions, [sessionId]: session },
+          sessions: {
+            ...state.sessions,
+            [sessionId]: newSession
+          },
           activeSessionId: sessionId
         }));
-
-        return sessionId;
       },
 
-      deleteSession: (sessionId) => {
+      setActiveSession: (sessionId: string | null) => {
+        set({ activeSessionId: sessionId });
+      },
+
+      deleteSession: (sessionId: string) => {
         set((state) => {
-          const newSessions = { ...state.sessions };
-          delete newSessions[sessionId];
+          const { [sessionId]: deleted, ...remainingSessions } = state.sessions;
           return {
-            sessions: newSessions,
-            activeSessionId: state.activeSessionId === sessionId ? undefined : state.activeSessionId
+            sessions: remainingSessions,
+            activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId
           };
         });
       },
 
-      setActiveSession: (sessionId) => {
-        set({ activeSessionId: sessionId });
-      },
-
-      addPlayer: (sessionId, name, color) => {
-        const playerId = generatePlayerId();
-        const player: Player = {
-          id: playerId,
-          name,
-          color,
-          createdAt: Date.now(),
-          active: true,
-          order: Object.keys(get().sessions[sessionId]?.players || {}).length,
-          rejoinCount: 0
-        };
-
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              players: { ...state.sessions[sessionId].players, [playerId]: player }
-            }
-          }
-        }));
-
-        return playerId;
-      },
-
-      updatePlayer: (sessionId, playerId, updates) => {
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              players: {
-                ...state.sessions[sessionId].players,
-                [playerId]: { ...state.sessions[sessionId].players[playerId], ...updates }
-              }
-            }
-          }
-        }));
-      },
-
-      removePlayer: (sessionId, playerId) => {
-        const session = get().sessions[sessionId];
-        if (!session) return;
-
-        // Only allow removal if player has no financial activity
-        const hasBuyIns = session.buyIns.some(buyIn => buyIn.playerId === playerId && !buyIn.deleted);
-        const hasCashOuts = session.cashOuts.some(cashOut => cashOut.playerId === playerId && !cashOut.supersededBy);
-
-        if (hasBuyIns || hasCashOuts) {
-          throw new Error('Cannot remove player with financial activity. Use cash out instead.');
-        }
-
+      addPlayer: (sessionId: string, name: string, color?: string) => {
         set((state) => {
-          const newPlayers = { ...state.sessions[sessionId].players };
-          delete newPlayers[playerId];
+          const session = state.sessions[sessionId];
+          if (!session) return state;
+
+          const playerId = generateId();
+          const playerCount = Object.keys(session.players).length;
+          
+          const newPlayer: Player = {
+            id: playerId,
+            name,
+            color,
+            createdAt: Date.now(),
+            active: true,
+            order: playerCount,
+            rejoinCount: 0
+          };
+
           return {
             sessions: {
               ...state.sessions,
               [sessionId]: {
-                ...state.sessions[sessionId],
-                players: newPlayers
+                ...session,
+                players: {
+                  ...session.players,
+                  [playerId]: newPlayer
+                }
               }
             }
           };
         });
       },
 
-      recordBuyIn: (sessionId, playerId, amountCents) => {
-        if (!validateAmount(amountCents)) {
-          throw new Error('Invalid buy-in amount');
-        }
-
-        const buyIn: BuyIn = {
-          id: generateBuyInId(),
-          sessionId,
-          playerId,
-          amountCents,
-          ts: Date.now()
-        };
-
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              buyIns: [...state.sessions[sessionId].buyIns, buyIn]
-            }
-          }
-        }));
-      },
-
-      undoLastBuyIn: (sessionId) => {
+      removePlayer: (sessionId: string, playerId: string) => {
         set((state) => {
           const session = state.sessions[sessionId];
-          const lastBuyIn = session.buyIns[session.buyIns.length - 1];
-          if (!lastBuyIn) return state;
+          if (!session) return state;
 
-          const updatedBuyIns = session.buyIns.map((buyIn, index) => 
-            index === session.buyIns.length - 1 ? { ...buyIn, deleted: true } : buyIn
-          );
+          const { [playerId]: removed, ...remainingPlayers } = session.players;
+          
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...session,
+                players: remainingPlayers
+              }
+            }
+          };
+        });
+      },
+
+      recordBuyIn: (sessionId: string, playerId: string, amountCents: number) => {
+        set((state) => {
+          const session = state.sessions[sessionId];
+          if (!session) return state;
+
+          const buyIn: BuyIn = {
+            id: generateId(),
+            sessionId,
+            playerId,
+            amountCents,
+            ts: Date.now()
+          };
+
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...session,
+                buyIns: [...session.buyIns, buyIn]
+              }
+            }
+          };
+        });
+      },
+
+      undoLastBuyIn: (sessionId: string) => {
+        set((state) => {
+          const session = state.sessions[sessionId];
+          if (!session || session.buyIns.length === 0) return state;
+
+          const updatedBuyIns = [...session.buyIns];
+          updatedBuyIns[updatedBuyIns.length - 1] = {
+            ...updatedBuyIns[updatedBuyIns.length - 1],
+            deleted: true
+          };
 
           return {
             sessions: {
@@ -223,18 +212,20 @@ export const useAppStore = create<AppStore>()(
         });
       },
 
-      undoLastBuyInForPlayer: (sessionId, playerId) => {
+      undoLastBuyInForPlayer: (sessionId: string, playerId: string) => {
         set((state) => {
           const session = state.sessions[sessionId];
+          if (!session) return state;
+
           const playerBuyIns = session.buyIns
-            .filter(buyIn => buyIn.playerId === playerId && !buyIn.deleted)
+            .filter(b => b.playerId === playerId && !b.deleted)
             .sort((a, b) => b.ts - a.ts);
 
           if (playerBuyIns.length === 0) return state;
 
           const lastBuyIn = playerBuyIns[0];
-          const updatedBuyIns = session.buyIns.map(buyIn => 
-            buyIn.id === lastBuyIn.id ? { ...buyIn, deleted: true } : buyIn
+          const updatedBuyIns = session.buyIns.map(b => 
+            b.id === lastBuyIn.id ? { ...b, deleted: true } : b
           );
 
           return {
@@ -249,154 +240,175 @@ export const useAppStore = create<AppStore>()(
         });
       },
 
-      cashOutPlayer: (sessionId, playerId, amountCents, reason) => {
-        const cashOut: CashOut = {
-          id: generateCashOutId(),
-          sessionId,
-          playerId,
-          amountCents,
-          ts: Date.now(),
-          reason
-        };
+      cashOutPlayer: (sessionId: string, playerId: string, amountCents: number, reason: 'leave' | 'final') => {
+        set((state) => {
+          const session = state.sessions[sessionId];
+          if (!session) return state;
 
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              cashOuts: [...state.sessions[sessionId].cashOuts, cashOut],
-              players: {
-                ...state.sessions[sessionId].players,
-                [playerId]: {
-                  ...state.sessions[sessionId].players[playerId],
-                  active: false
-                }
+          const cashOut: CashOut = {
+            id: generateId(),
+            sessionId,
+            playerId,
+            amountCents,
+            ts: Date.now(),
+            reason
+          };
+
+          // Update player status
+          const updatedPlayers = {
+            ...session.players,
+            [playerId]: {
+              ...session.players[playerId],
+              active: false
+            }
+          };
+
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...session,
+                cashOuts: [...session.cashOuts, cashOut],
+                players: updatedPlayers
               }
             }
-          }
-        }));
-      },
-
-      editCashOut: (sessionId, cashOutId, newAmountCents) => {
-        const newCashOut: CashOut = {
-          id: generateCashOutId(),
-          sessionId,
-          playerId: get().sessions[sessionId].cashOuts.find(c => c.id === cashOutId)?.playerId || '',
-          amountCents: newAmountCents,
-          ts: Date.now(),
-          reason: 'leave'
-        };
-
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              cashOuts: [
-                ...state.sessions[sessionId].cashOuts.map(c => 
-                  c.id === cashOutId ? { ...c, supersededBy: newCashOut.id } : c
-                ),
-                newCashOut
-              ]
-            }
-          }
-        }));
-      },
-
-      rejoinPlayer: (sessionId, playerId) => {
-        const reentry: ReentryEvent = {
-          id: generateBuyInId(),
-          sessionId,
-          playerId,
-          ts: Date.now()
-        };
-
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              reentries: [...state.sessions[sessionId].reentries, reentry],
-              players: {
-                ...state.sessions[sessionId].players,
-                [playerId]: {
-                  ...state.sessions[sessionId].players[playerId],
-                  active: true,
-                  rejoinCount: state.sessions[sessionId].players[playerId].rejoinCount + 1
-                }
-              }
-            }
-          }
-        }));
-      },
-
-      finalizeSession: (sessionId, finalStacksMap) => {
-        const session = get().sessions[sessionId];
-        if (!session) return;
-
-        // Record final cashouts for active players
-        const finalCashOuts: CashOut[] = Object.entries(finalStacksMap).map(([playerId, amountCents]) => ({
-          id: generateCashOutId(),
-          sessionId,
-          playerId,
-          amountCents,
-          ts: Date.now(),
-          reason: 'final'
-        }));
-
-        const settlement = calculateSettlement({
-          ...session,
-          cashOuts: [...session.cashOuts, ...finalCashOuts]
+          };
         });
+      },
 
-        set((state) => ({
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...state.sessions[sessionId],
-              cashOuts: [...state.sessions[sessionId].cashOuts, ...finalCashOuts],
-              status: 'closed',
-              closedAt: Date.now(),
-              settlement
+      rejoinPlayer: (sessionId: string, playerId: string) => {
+        set((state) => {
+          const session = state.sessions[sessionId];
+          if (!session) return state;
+
+          const player = session.players[playerId];
+          if (!player) return state;
+
+          const reentry = {
+            id: generateId(),
+            sessionId,
+            playerId,
+            ts: Date.now()
+          };
+
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...session,
+                reentries: [...session.reentries, reentry],
+                players: {
+                  ...session.players,
+                  [playerId]: {
+                    ...player,
+                    active: true,
+                    rejoinCount: player.rejoinCount + 1
+                  }
+                }
+              }
             }
+          };
+        });
+      },
+
+      finalizeSession: (sessionId: string, finalStacks: Record<string, number>) => {
+        set((state) => {
+          const session = state.sessions[sessionId];
+          if (!session) return state;
+
+          // Record final cash-outs for active players
+          const finalCashOuts: CashOut[] = Object.entries(finalStacks).map(([playerId, amountCents]) => ({
+            id: generateId(),
+            sessionId,
+            playerId,
+            amountCents,
+            ts: Date.now(),
+            reason: 'final' as const
+          }));
+
+          // Compute settlement
+          const allCashOuts = [...session.cashOuts, ...finalCashOuts];
+          const sessionWithFinalCashOuts = {
+            ...session,
+            cashOuts: allCashOuts
+          };
+          const settlement = calculateSettlement(sessionWithFinalCashOuts);
+
+          return {
+            sessions: {
+              ...state.sessions,
+              [sessionId]: {
+                ...session,
+                cashOuts: allCashOuts,
+                status: 'closed',
+                closedAt: Date.now(),
+                settlement
+              }
+            }
+          };
+        });
+      },
+
+      updateSettings: (newSettings: Partial<UserSettings>) => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ...newSettings
           }
         }));
       },
 
-      exportSession: (sessionId) => {
-        const session = get().sessions[sessionId];
-        return JSON.stringify(session, null, 2);
+      resetSettings: () => {
+        set({ settings: DEFAULT_SETTINGS });
       },
 
-      importSessions: (json) => {
+      exportData: () => {
+        const state = get();
+        return JSON.stringify({
+          sessions: state.sessions,
+          settings: state.settings,
+          version: 1,
+          exportedAt: new Date().toISOString()
+        });
+      },
+
+      importData: (jsonData: string) => {
         try {
-          const importedSessions = JSON.parse(json);
-          set((state) => ({
-            sessions: { ...state.sessions, ...importedSessions }
-          }));
+          const data = JSON.parse(jsonData);
+          set({
+            sessions: data.sessions || {},
+            settings: data.settings || DEFAULT_SETTINGS,
+            activeSessionId: null
+          });
         } catch (error) {
-          throw new Error('Invalid import data');
+          console.error('Failed to import data:', error);
         }
       },
 
-      setTheme: (theme) => {
-        set({ theme });
-      },
-
-      getSession: (sessionId) => {
-        return get().sessions[sessionId];
-      },
-
-      getActiveSession: () => {
-        const { activeSessionId, sessions } = get();
-        return activeSessionId ? sessions[activeSessionId] : undefined;
+      toggleTheme: () => {
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            theme: state.settings.theme === 'light' ? 'dark' : 'light'
+          }
+        }));
       }
     }),
     {
       name: 'poker-cashout-storage',
-      version: SCHEMA_VERSION,
+      version: 1,
       migrate: (persistedState: any, version: number) => {
-        // Handle future schema migrations here
+        if (version === 0) {
+          // Migrate from old format
+          return {
+            sessions: persistedState.sessions || {},
+            activeSessionId: persistedState.activeSessionId || null,
+            settings: {
+              ...DEFAULT_SETTINGS,
+              theme: persistedState.theme || 'auto'
+            }
+          };
+        }
         return persistedState;
       }
     }

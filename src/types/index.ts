@@ -79,11 +79,20 @@ export interface SettlementTx {
   paid?: boolean; 
 }
 
+export interface UserSettings {
+  currency: string;
+  quickBuyInOptions: number[]; // in cents
+  defaultVarianceTolerance: number; // in cents
+  theme: 'light' | 'dark' | 'auto';
+  showConfirmations: boolean;
+  autoSave: boolean;
+  language: string;
+}
+
 export interface AppState {
   sessions: { [sessionId: string]: Session };
-  activeSessionId?: string;
-  theme: 'light' | 'dark';
-  version: number;
+  activeSessionId: string | null;
+  settings: UserSettings;
 }
 
 export type PlayerId = string;

@@ -1,19 +1,23 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 import { CreateSessionModal } from './CreateSessionModal';
-import { formatCurrency } from '../utils/currency';
 
 export function SessionList() {
-  const { sessions, setActiveSession, deleteSession } = useAppStore();
+  const { sessions, setActiveSession, createSession, deleteSession } = useStore();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const sessionList = Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt);
+  const handleCreateSession = (name: string, currency?: string) => {
+    createSession(name, currency);
+    setShowCreateModal(false);
+  };
 
   const handleDeleteSession = (sessionId: string) => {
     if (confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
       deleteSession(sessionId);
     }
   };
+
+  const sessionList = Object.values(sessions).sort((a, b) => b.createdAt - a.createdAt);
 
   return (
     <div>
@@ -28,80 +32,71 @@ export function SessionList() {
       </div>
 
       {sessionList.length === 0 ? (
-        <div className="card text-center">
-          <h3 className="text-lg font-semibold mb-2">No sessions yet</h3>
-          <p className="text-secondary mb-4">Create your first poker session to get started.</p>
+        <div className="text-center py-8">
+          <p className="text-secondary mb-4">No sessions yet. Create your first poker session!</p>
           <button 
-            className="btn btn-primary" 
+            className="btn btn-primary"
             onClick={() => setShowCreateModal(true)}
           >
             Create Session
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {sessionList.map((session) => {
-            const totalBuyIns = session.buyIns
-              .filter(buyIn => !buyIn.deleted)
-              .reduce((sum, buyIn) => sum + buyIn.amountCents, 0);
-            
-            const activePlayers = Object.values(session.players).filter(p => p.active).length;
-            const totalPlayers = Object.values(session.players).length;
-
-            return (
-              <div key={session.id} className="card">
-                <div className="card-header">
-                  <div>
-                    <h3 className="card-title">{session.name}</h3>
-                    <p className="text-secondary text-sm">
-                      {new Date(session.createdAt).toLocaleDateString()} • 
-                      {session.status === 'open' ? ' Active' : ' Closed'} • 
-                      {totalPlayers} player{totalPlayers !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {session.status === 'open' && (
-                      <button 
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setActiveSession(session.id)}
-                      >
-                        Continue
-                      </button>
+        <div className="space-y-3">
+          {sessionList.map(session => (
+            <div key={session.id} className="card">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-1">{session.name}</h3>
+                  <div className="text-sm text-secondary">
+                    Created: {new Date(session.createdAt).toLocaleDateString()}
+                    {session.closedAt && (
+                      <span className="ml-2">• Closed: {new Date(session.closedAt).toLocaleDateString()}</span>
                     )}
+                  </div>
+                  <div className="text-sm text-secondary">
+                    Players: {Object.keys(session.players).length} • 
+                    Status: <span className={session.status === 'open' ? 'text-success' : 'text-secondary'}>
+                      {session.status === 'open' ? 'Active' : 'Closed'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  {session.status === 'open' && (
+                    <button 
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setActiveSession(session.id)}
+                    >
+                      Open
+                    </button>
+                  )}
+                  {session.status === 'closed' && session.settlement && (
                     <button 
                       className="btn btn-secondary btn-sm"
                       onClick={() => setActiveSession(session.id)}
                     >
-                      View
+                      View Settlement
                     </button>
-                    <button 
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDeleteSession(session.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-secondary">Total Buy-ins:</span>
-                    <div className="font-semibold">{formatCurrency(totalBuyIns, session.currency)}</div>
-                  </div>
-                  <div>
-                    <span className="text-secondary">Active Players:</span>
-                    <div className="font-semibold">{activePlayers}/{totalPlayers}</div>
-                  </div>
+                  )}
+                  <button 
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleDeleteSession(session.id)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
-      {showCreateModal && (
-        <CreateSessionModal onClose={() => setShowCreateModal(false)} />
-      )}
+      <CreateSessionModal 
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreateSession}
+      />
     </div>
   );
 } 

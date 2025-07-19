@@ -1,90 +1,77 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 
 interface CreateSessionModalProps {
+  isOpen: boolean;
   onClose: () => void;
+  onCreate: (name: string, currency?: string) => void;
 }
 
-export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
-  const { createSession } = useAppStore();
-  const [name, setName] = useState('');
-  const [currency, setCurrency] = useState('$');
-  const [error, setError] = useState('');
+export function CreateSessionModal({ isOpen, onClose, onCreate }: CreateSessionModalProps) {
+  const { settings } = useStore();
+  const [sessionName, setSessionName] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState(settings.currency);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
-    
-    if (!name.trim()) {
-      setError('Session name is required');
-      return;
+    if (sessionName.trim()) {
+      onCreate(sessionName.trim(), selectedCurrency);
+      setSessionName('');
+      setSelectedCurrency(settings.currency);
     }
+  };
 
-    try {
-      createSession({
-        name: name.trim(),
-        currency,
-        settings: {
-          varianceToleranceCents: 100,
-          quickBuyInOptions: [2000, 4000, 10000] // $20, $40, $100
-        }
-      });
-      onClose();
-    } catch (err) {
-      setError('Failed to create session');
-    }
+  const handleCancel = () => {
+    setSessionName('');
+    setSelectedCurrency(settings.currency);
+    onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Create New Session</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h3 className="modal-title">Create New Session</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="session-name">
-              Session Name
-            </label>
+            <label className="form-label">Session Name</label>
             <input
-              id="session-name"
               type="text"
               className="form-input"
-              value={name}
-              onChange={(e) => setName((e.target as HTMLInputElement).value)}
-              placeholder="Friday Night Poker"
+              value={sessionName}
+              onChange={(e) => setSessionName(e.currentTarget.value)}
+              placeholder="e.g., Friday Night Poker"
               required
+              autoFocus
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label" htmlFor="currency">
-              Currency Symbol
-            </label>
-            <select
-              id="currency"
-              className="form-input"
-              value={currency}
-              onChange={(e) => setCurrency((e.target as HTMLSelectElement).value)}
-            >
-              <option value="$">$ (USD)</option>
-              <option value="€">€ (EUR)</option>
-              <option value="£">£ (GBP)</option>
-              <option value="¥">¥ (JPY)</option>
-              <option value="₹">₹ (INR)</option>
-            </select>
+            <label className="form-label">Currency</label>
+            <div className="flex gap-2">
+              {['$', '€', '£', '¥', '₹'].map(symbol => (
+                <button
+                  key={symbol}
+                  type="button"
+                  className={`btn ${selectedCurrency === symbol ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setSelectedCurrency(symbol)}
+                >
+                  {symbol}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {error && (
-            <div className="text-danger mb-3">{error}</div>
-          )}
-
-          <div className="flex gap-3">
-            <button type="button" className="btn btn-secondary flex-1" onClick={onClose}>
+          <div className="flex gap-2 justify-end">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary flex-1">
+            <button type="submit" className="btn btn-primary">
               Create Session
             </button>
           </div>

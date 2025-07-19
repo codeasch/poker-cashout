@@ -1,91 +1,99 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 import type { Session, Player } from '../types';
 import { parseCurrency, formatCurrency } from '../utils/currency';
 
 interface BuyInModalProps {
+  isOpen: boolean;
+  onClose: () => void;
   session: Session;
   player: Player;
-  onClose: () => void;
 }
 
-export function BuyInModal({ session, player, onClose }: BuyInModalProps) {
-  const { recordBuyIn } = useAppStore();
+export function BuyInModal({ isOpen, onClose, session, player }: BuyInModalProps) {
+  const { recordBuyIn } = useStore();
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
 
+  if (!isOpen) return null;
+
   const handleSubmit = (e: Event) => {
     e.preventDefault();
-    
-    const amountCents = parseCurrency(amount);
-    if (amountCents <= 0) {
-      setError('Please enter a valid amount');
-      return;
-    }
+    setError('');
 
     try {
+      const amountCents = parseCurrency(amount);
+      if (amountCents <= 0) {
+        setError('Amount must be greater than 0');
+        return;
+      }
+
       recordBuyIn(session.id, player.id, amountCents);
+      setAmount('');
       onClose();
     } catch (err) {
-      setError('Failed to record buy-in');
+      setError('Invalid amount');
     }
   };
 
-  const handleQuickAmount = (amountCents: number) => {
-    setAmount(formatCurrency(amountCents, session.currency).replace(session.currency, ''));
+  const handleQuickBuyIn = (amountCents: number) => {
+    recordBuyIn(session.id, player.id, amountCents);
+    onClose();
+  };
+
+  const handleCancel = () => {
+    setAmount('');
+    setError('');
+    onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Buy-in for {player.name}</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h3 className="modal-title">Buy-in for {player.name}</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="buyin-amount">
-              Amount ({session.currency})
-            </label>
+            <label className="form-label">Amount ({session.currency})</label>
             <input
-              id="buyin-amount"
               type="number"
-              step="0.01"
-              min="0.01"
               className="form-input"
               value={amount}
-              onChange={(e) => setAmount((e.target as HTMLInputElement).value)}
+              onChange={(e) => setAmount(e.currentTarget.value)}
               placeholder="0.00"
+              step="0.01"
+              min="0"
               required
+              autoFocus
             />
+            {error && <div className="text-danger text-sm mt-1">{error}</div>}
           </div>
 
+          {/* Quick buy-in buttons - Always show exactly 3 */}
           <div className="form-group">
-            <label className="form-label">Quick Amounts</label>
+            <label className="form-label">Quick Options</label>
             <div className="flex gap-2 flex-wrap">
-              {session.settings.quickBuyInOptions.map((amountCents) => (
+              {session.settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
                 <button
-                  key={amountCents}
+                  key={index}
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  onClick={() => handleQuickAmount(amountCents)}
+                  onClick={() => handleQuickBuyIn(amountCents)}
                 >
-                  {formatCurrency(amountCents, session.currency)}
+                  +{formatCurrency(amountCents, session.currency)}
                 </button>
               ))}
             </div>
           </div>
 
-          {error && (
-            <div className="text-danger mb-3">{error}</div>
-          )}
-
-          <div className="flex gap-3">
-            <button type="button" className="btn btn-secondary flex-1" onClick={onClose}>
+          <div className="flex gap-2 justify-end">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary flex-1">
+            <button type="submit" className="btn btn-primary">
               Record Buy-in
             </button>
           </div>

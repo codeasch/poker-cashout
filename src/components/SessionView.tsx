@@ -1,30 +1,34 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
-import type { Session } from '../types';
+import { useStore } from '../store';
+import { formatCurrency } from '../utils/currency';
 import { PlayerRow } from './PlayerRow';
 import { AddPlayerModal } from './AddPlayerModal';
 import { EndGameWizard } from './EndGameWizard';
 import { SettlementView } from './SettlementView';
-import { formatCurrency } from '../utils/currency';
 
 interface SessionViewProps {
-  session: Session;
+  sessionId: string;
+  onBack: () => void;
 }
 
-export function SessionView({ session }: SessionViewProps) {
-  const { setActiveSession } = useAppStore();
+export function SessionView({ sessionId, onBack }: SessionViewProps) {
+  const { sessions, setActiveSession } = useStore();
   const [showAddPlayer, setShowAddPlayer] = useState(false);
   const [showEndGame, setShowEndGame] = useState(false);
   const [showSettlement, setShowSettlement] = useState(false);
 
+  const session = sessions[sessionId];
+  if (!session) {
+    return <div>Session not found</div>;
+  }
+
+  // Calculate totals
   const totalBuyIns = session.buyIns
-    .filter(buyIn => !buyIn.deleted)
-    .reduce((sum, buyIn) => sum + buyIn.amountCents, 0);
+    .filter(b => !b.deleted)
+    .reduce((sum, b) => sum + b.amountCents, 0);
 
   const activePlayers = Object.values(session.players).filter(p => p.active);
-  const leftPlayers = Object.values(session.players).filter(p => !p.active);
-
-  const canEndGame = activePlayers.length >= 2;
+  const canEndGame = session.status === 'open' && activePlayers.length >= 2;
 
   return (
     <div>
@@ -33,7 +37,7 @@ export function SessionView({ session }: SessionViewProps) {
         <div>
           <button 
             className="btn btn-secondary btn-sm mb-2"
-            onClick={() => setActiveSession('')}
+            onClick={onBack}
           >
             ← Back to Sessions
           </button>
@@ -74,84 +78,45 @@ export function SessionView({ session }: SessionViewProps) {
       </div>
 
       {/* Players */}
-      <div className="space-y-4">
-        {activePlayers.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Active Players</h3>
-            <div className="space-y-3">
-              {activePlayers.map((player) => (
-                <PlayerRow 
-                  key={player.id} 
-                  session={session} 
-                  player={player} 
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {leftPlayers.length > 0 && (
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Left Players</h3>
-            <div className="space-y-3">
-              {leftPlayers.map((player) => (
-                <PlayerRow 
-                  key={player.id} 
-                  session={session} 
-                  player={player} 
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {Object.values(session.players).length === 0 && (
-          <div className="card text-center">
-            <h3 className="text-lg font-semibold mb-2">No players yet</h3>
-            <p className="text-secondary mb-4">Add players to start tracking buy-ins.</p>
+      <div className="space-y-3">
+        <h3 className="text-lg font-semibold mb-3">Players</h3>
+        {Object.values(session.players).length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-secondary mb-4">No players yet. Add your first player!</p>
             <button 
-              className="btn btn-primary" 
+              className="btn btn-primary"
               onClick={() => setShowAddPlayer(true)}
             >
-              Add First Player
+              Add Player
             </button>
           </div>
+        ) : (
+          Object.values(session.players)
+            .sort((a, b) => a.order - b.order)
+            .map(player => (
+              <PlayerRow key={player.id} session={session} player={player} />
+            ))
         )}
       </div>
 
-      {/* Floating Action Button for End Game */}
-      {session.status === 'open' && canEndGame && (
-        <button 
-          className="fab"
-          onClick={() => setShowEndGame(true)}
-          aria-label="End Game"
-        >
-          🏁
-        </button>
-      )}
-
       {/* Modals */}
-      {showAddPlayer && (
-        <AddPlayerModal 
-          sessionId={session.id} 
-          onClose={() => setShowAddPlayer(false)} 
-        />
-      )}
+      <AddPlayerModal 
+        isOpen={showAddPlayer}
+        onClose={() => setShowAddPlayer(false)}
+        sessionId={sessionId}
+      />
 
-      {showEndGame && (
-        <EndGameWizard 
-          session={session} 
-          onClose={() => setShowEndGame(false)} 
-        />
-      )}
+      <EndGameWizard 
+        isOpen={showEndGame}
+        onClose={() => setShowEndGame(false)}
+        sessionId={sessionId}
+      />
 
-      {showSettlement && session.settlement && (
-        <SettlementView 
-          session={session}
-          settlement={session.settlement}
-          onClose={() => setShowSettlement(false)}
-        />
-      )}
+      <SettlementView 
+        isOpen={showSettlement}
+        onClose={() => setShowSettlement(false)}
+        session={session}
+      />
     </div>
   );
 } 

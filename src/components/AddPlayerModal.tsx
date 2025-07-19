@@ -1,88 +1,85 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 
 interface AddPlayerModalProps {
-  sessionId: string;
+  isOpen: boolean;
   onClose: () => void;
+  sessionId: string;
 }
 
-export function AddPlayerModal({ sessionId, onClose }: AddPlayerModalProps) {
-  const { addPlayer } = useAppStore();
-  const [name, setName] = useState('');
-  const [color, setColor] = useState('');
-  const [error, setError] = useState('');
+const PLAYER_COLORS = [
+  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
+  '#06B6D4', '#F97316', '#EC4899', '#84CC16', '#6366F1'
+];
 
-  const colors = [
-    '#3b82f6', '#ef4444', '#10b981', '#f59e0b', 
-    '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'
-  ];
+export function AddPlayerModal({ isOpen, onClose, sessionId }: AddPlayerModalProps) {
+  const { addPlayer } = useStore();
+  const [playerName, setPlayerName] = useState('');
+  const [selectedColor, setSelectedColor] = useState(PLAYER_COLORS[0]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
-    
-    if (!name.trim()) {
-      setError('Player name is required');
-      return;
-    }
-
-    try {
-      addPlayer(sessionId, name.trim(), color || undefined);
+    if (playerName.trim()) {
+      addPlayer(sessionId, playerName.trim(), selectedColor);
+      setPlayerName('');
+      setSelectedColor(PLAYER_COLORS[0]);
       onClose();
-    } catch (err) {
-      setError('Failed to add player');
     }
+  };
+
+  const handleCancel = () => {
+    setPlayerName('');
+    setSelectedColor(PLAYER_COLORS[0]);
+    onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Add Player</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h3 className="modal-title">Add Player</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label" htmlFor="player-name">
-              Player Name
-            </label>
+            <label className="form-label">Player Name</label>
             <input
-              id="player-name"
               type="text"
               className="form-input"
-              value={name}
-              onChange={(e) => setName((e.target as HTMLInputElement).value)}
+              value={playerName}
+              onChange={(e) => setPlayerName(e.currentTarget.value)}
               placeholder="Enter player name"
               required
+              autoFocus
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Player Color (Optional)</label>
+            <label className="form-label">Player Color</label>
             <div className="flex gap-2 flex-wrap">
-              {colors.map((colorOption) => (
+              {PLAYER_COLORS.map(color => (
                 <button
-                  key={colorOption}
+                  key={color}
                   type="button"
-                  className={`w-8 h-8 rounded-full border-2 ${
-                    color === colorOption ? 'border-gray-900' : 'border-gray-300'
-                  }`}
-                  style={{ backgroundColor: colorOption }}
-                  onClick={() => setColor(colorOption)}
+                  className="w-8 h-8 rounded-full border-2"
+                  style={{ 
+                    backgroundColor: color,
+                    borderColor: selectedColor === color ? '#000' : 'transparent'
+                  }}
+                  onClick={() => setSelectedColor(color)}
                 />
               ))}
             </div>
           </div>
 
-          {error && (
-            <div className="text-danger mb-3">{error}</div>
-          )}
-
-          <div className="flex gap-3">
-            <button type="button" className="btn btn-secondary flex-1" onClick={onClose}>
+          <div className="flex gap-2 justify-end">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary flex-1">
+            <button type="submit" className="btn btn-primary">
               Add Player
             </button>
           </div>

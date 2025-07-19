@@ -1,19 +1,21 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
-import type { Session } from '../types';
-import { parseCurrency, formatCurrency } from '../utils/currency';
-import { computeVariance } from '../utils/settlement';
+import { useStore } from '../store';
+import { formatCurrency } from '../utils/currency';
 
 interface EndGameWizardProps {
-  session: Session;
+  isOpen: boolean;
   onClose: () => void;
+  sessionId: string;
 }
 
-export function EndGameWizard({ session, onClose }: EndGameWizardProps) {
-  const { finalizeSession } = useAppStore();
+export function EndGameWizard({ isOpen, onClose, sessionId }: EndGameWizardProps) {
+  const { sessions, finalizeSession } = useStore();
   const [step, setStep] = useState(1);
   const [finalStacks, setFinalStacks] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+
+  const session = sessions[sessionId];
+  if (!session || !isOpen) return null;
 
   const activePlayers = Object.values(session.players).filter(p => p.active);
 
@@ -26,10 +28,10 @@ export function EndGameWizard({ session, onClose }: EndGameWizardProps) {
 
   const handleNext = () => {
     if (step === 1) {
-      // Validate all players have stack values
-      const missingPlayers = activePlayers.filter(p => !finalStacks[p.id] || finalStacks[p.id] === '0');
-      if (missingPlayers.length > 0) {
-        setError('Please enter final stack values for all players');
+      // Validate all active players have stack values
+      const missingStacks = activePlayers.filter(p => !finalStacks[p.id] || finalStacks[p.id] === '');
+      if (missingStacks.length > 0) {
+        setError('Please enter final stack values for all active players');
         return;
       }
       setStep(2);
@@ -37,12 +39,12 @@ export function EndGameWizard({ session, onClose }: EndGameWizardProps) {
     } else if (step === 2) {
       // Finalize the session
       try {
-        const finalStacksMap: Record<string, number> = {};
-        Object.entries(finalStacks).forEach(([playerId, amount]) => {
-          finalStacksMap[playerId] = parseCurrency(amount);
-        });
+        const stacksInCents: Record<string, number> = {};
+        for (const [playerId, value] of Object.entries(finalStacks)) {
+          stacksInCents[playerId] = Math.round(parseFloat(value) * 100);
+        }
         
-        finalizeSession(session.id, finalStacksMap);
+        finalizeSession(sessionId, stacksInCents);
         onClose();
       } catch (err) {
         setError('Failed to finalize session');
@@ -51,124 +53,135 @@ export function EndGameWizard({ session, onClose }: EndGameWizardProps) {
   };
 
   const handleBack = () => {
-    setStep(step - 1);
-    setError('');
+    if (step === 2) {
+      setStep(1);
+      setError('');
+    }
   };
 
+  const handleCancel = () => {
+    setStep(1);
+    setFinalStacks({});
+    setError('');
+    onClose();
+  };
+
+  // Calculate variance
   const totalBuyIns = session.buyIns
-    .filter(buyIn => !buyIn.deleted)
-    .reduce((sum, buyIn) => sum + buyIn.amountCents, 0);
+    .filter(b => !b.deleted)
+    .reduce((sum, b) => sum + b.amountCents, 0);
 
   const totalCashOuts = session.cashOuts
-    .filter(cashOut => !cashOut.supersededBy)
-    .reduce((sum, cashOut) => sum + cashOut.amountCents, 0);
+    .filter(c => !c.supersededBy)
+    .reduce((sum, c) => sum + c.amountCents, 0);
 
   const finalStacksTotal = Object.values(finalStacks)
-    .reduce((sum, amount) => sum + parseCurrency(amount), 0);
+    .filter(v => v && v !== '')
+    .reduce((sum, v) => sum + Math.round(parseFloat(v) * 100), 0);
 
-  const totalCashReturned = totalCashOuts + finalStacksTotal;
-  const variance = totalCashReturned - totalBuyIns;
-  const isVarianceOk = Math.abs(variance) <= session.settings.varianceToleranceCents;
+  const variance = (totalCashOuts + finalStacksTotal) - totalBuyIns;
+  const isVarianceAcceptable = Math.abs(variance) <= session.settings.varianceToleranceCents;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">End Game - Step {step} of 2</h2>
-          <button className="modal-close" onClick={onClose}>×</button>
+          <h3 className="modal-title">End Game - Step {step} of 2</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
         </div>
 
         {step === 1 && (
           <div>
-            <div className="mb-4">
-              <h3 className="font-semibold mb-2">Enter Final Stack Values</h3>
-              <p className="text-secondary text-sm">
+            <div className="form-group">
+              <label className="form-label">Enter Final Stack Values</label>
+              <p className="text-sm text-secondary mb-3">
                 Enter the final chip values for each active player
               </p>
+              
+              <div className="space-y-3">
+                {activePlayers.map(player => (
+                  <div key={player.id} className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <label className="form-label text-sm">{player.name}</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={finalStacks[player.id] || ''}
+                        onChange={(e) => handleStackChange(player.id, e.currentTarget.value)}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        required
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {activePlayers.map((player) => (
-                <div key={player.id} className="form-group">
-                  <label className="form-label" htmlFor={`stack-${player.id}`}>
-                    {player.name} - Final Stack ({session.currency})
-                  </label>
-                  <input
-                    id={`stack-${player.id}`}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    className="form-input"
-                    value={finalStacks[player.id] || ''}
-                    onChange={(e) => handleStackChange(player.id, (e.target as HTMLInputElement).value)}
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-              ))}
+            {error && <div className="text-danger mb-3">{error}</div>}
+
+            <div className="flex gap-2 justify-end">
+              <button className="btn btn-secondary" onClick={handleCancel}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleNext}>
+                Review & Finalize
+              </button>
             </div>
           </div>
         )}
 
         {step === 2 && (
           <div>
-            <div className="mb-4">
-              <h3 className="font-semibold mb-2">Review Variance</h3>
-              <p className="text-secondary text-sm">
-                Verify that the total cash returned matches the total buy-ins
-              </p>
-            </div>
+            <div className="form-group">
+              <h4 className="font-semibold mb-3">Review Final Values</h4>
+              
+              <div className="space-y-2 mb-4">
+                {activePlayers.map(player => (
+                  <div key={player.id} className="flex justify-between">
+                    <span>{player.name}</span>
+                    <span className="font-semibold">
+                      {formatCurrency(Math.round(parseFloat(finalStacks[player.id] || '0') * 100), session.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-            <div className="card mb-4">
-              <h4 className="font-semibold mb-2">Summary</h4>
-              <div className="text-sm space-y-1">
-                <div>Total Buy-ins: {formatCurrency(totalBuyIns, session.currency)}</div>
-                <div>Mid-game Cash-outs: {formatCurrency(totalCashOuts, session.currency)}</div>
-                <div>Final Stacks: {formatCurrency(finalStacksTotal, session.currency)}</div>
-                <div className="font-semibold">
-                  Total Cash Returned: {formatCurrency(totalCashReturned, session.currency)}
-                </div>
-                <div className={`font-semibold ${isVarianceOk ? 'text-success' : 'text-danger'}`}>
-                  Variance: {formatCurrency(Math.abs(variance), session.currency)} 
-                  {variance > 0 ? ' (over)' : variance < 0 ? ' (under)' : ' (exact)'}
+              <div className="card">
+                <h5 className="font-semibold mb-2">Summary</h5>
+                <div className="space-y-1 text-sm">
+                  <div>Total Buy-ins: {formatCurrency(totalBuyIns, session.currency)}</div>
+                  <div>Mid-game Cash-outs: {formatCurrency(totalCashOuts, session.currency)}</div>
+                  <div>Final Stacks: {formatCurrency(finalStacksTotal, session.currency)}</div>
+                  <div className={`font-semibold ${isVarianceAcceptable ? 'text-success' : 'text-danger'}`}>
+                    Variance: {formatCurrency(variance, session.currency)}
+                    {!isVarianceAcceptable && ' (Outside tolerance)'}
+                  </div>
                 </div>
               </div>
+
+              {!isVarianceAcceptable && (
+                <div className="text-warning text-sm mt-2">
+                  ⚠️ The variance is outside the acceptable tolerance. This might indicate counting errors.
+                </div>
+              )}
             </div>
 
-            {!isVarianceOk && (
-              <div className="card mb-4 bg-yellow-50 border-yellow-200">
-                <h4 className="font-semibold text-yellow-800 mb-2">⚠️ Variance Warning</h4>
-                <p className="text-sm text-yellow-700">
-                  The variance ({formatCurrency(Math.abs(variance), session.currency)}) exceeds the tolerance 
-                  ({formatCurrency(session.settings.varianceToleranceCents, session.currency)}). 
-                  Please double-check the final stack values.
-                </p>
-              </div>
-            )}
+            <div className="flex gap-2 justify-end">
+              <button className="btn btn-secondary" onClick={handleBack}>
+                Back
+              </button>
+              <button 
+                className="btn btn-success" 
+                onClick={handleNext}
+                disabled={!isVarianceAcceptable}
+              >
+                Finalize Session
+              </button>
+            </div>
           </div>
         )}
-
-        {error && (
-          <div className="text-danger mb-3">{error}</div>
-        )}
-
-        <div className="flex gap-3">
-          <button type="button" className="btn btn-secondary flex-1" onClick={onClose}>
-            Cancel
-          </button>
-          {step > 1 && (
-            <button type="button" className="btn btn-secondary flex-1" onClick={handleBack}>
-              Back
-            </button>
-          )}
-          <button 
-            type="button" 
-            className="btn btn-success flex-1" 
-            onClick={handleNext}
-          >
-            {step === 1 ? 'Next' : 'Finalize Session'}
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -1,19 +1,15 @@
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useAppStore();
-
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light');
-  };
+  const { settings, toggleTheme } = useStore();
 
   return (
     <button 
-      className="btn btn-secondary btn-sm" 
+      className="btn btn-secondary btn-sm"
       onClick={toggleTheme}
-      aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+      title={`Switch to ${settings.theme === 'light' ? 'dark' : 'light'} mode`}
     >
-      {theme === 'light' ? '🌙' : '☀️'}
+      {settings.theme === 'light' ? '🌙' : '☀️'}
     </button>
   );
 } 

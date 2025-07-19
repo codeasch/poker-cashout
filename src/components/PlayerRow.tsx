@@ -1,9 +1,9 @@
 import { useState } from 'preact/hooks';
-import { useAppStore } from '../store';
+import { useStore } from '../store';
 import type { Session, Player } from '../types';
+import { formatCurrency } from '../utils/currency';
 import { BuyInModal } from './BuyInModal';
 import { CashOutModal } from './CashOutModal';
-import { formatCurrency } from '../utils/currency';
 
 interface PlayerRowProps {
   session: Session;
@@ -11,23 +11,25 @@ interface PlayerRowProps {
 }
 
 export function PlayerRow({ session, player }: PlayerRowProps) {
-  const { recordBuyIn, cashOutPlayer, rejoinPlayer, undoLastBuyInForPlayer } = useAppStore();
+  const { recordBuyIn, cashOutPlayer, rejoinPlayer, undoLastBuyInForPlayer } = useStore();
   const [showBuyIn, setShowBuyIn] = useState(false);
   const [showCashOut, setShowCashOut] = useState(false);
 
-  const buyIns = session.buyIns.filter(buyIn => buyIn.playerId === player.id && !buyIn.deleted);
-  const cashOuts = session.cashOuts.filter(cashOut => cashOut.playerId === player.id && !cashOut.supersededBy);
+  // Calculate player totals
+  const buyIns = session.buyIns.filter(b => b.playerId === player.id && !b.deleted);
+  const cashOuts = session.cashOuts.filter(c => c.playerId === player.id && !c.supersededBy);
   
-  const totalBuyIns = buyIns.reduce((sum, buyIn) => sum + buyIn.amountCents, 0);
-  const totalCashOuts = cashOuts.reduce((sum, cashOut) => sum + cashOut.amountCents, 0);
+  const totalBuyIns = buyIns.reduce((sum, b) => sum + b.amountCents, 0);
+  const totalCashOuts = cashOuts.reduce((sum, c) => sum + c.amountCents, 0);
   const net = totalCashOuts - totalBuyIns;
 
   const getStatusBadge = () => {
-    if (player.active) {
-      return <span className="badge badge-active">Active</span>;
-    } else {
-      return <span className="badge badge-left">Left</span>;
+    if (session.status === 'closed') {
+      return <span className="badge badge-finished">FINISHED</span>;
     }
+    return player.active ? 
+      <span className="badge badge-active">ACTIVE</span> : 
+      <span className="badge badge-left">LEFT</span>;
   };
 
   const getRejoinBadge = () => {
@@ -37,20 +39,12 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
     return null;
   };
 
-  const handleQuickBuyIn = (amountCents: number) => {
-    try {
-      recordBuyIn(session.id, player.id, amountCents);
-    } catch (error) {
-      alert('Failed to record buy-in');
-    }
+  const handleRejoin = () => {
+    rejoinPlayer(session.id, player.id);
   };
 
-  const handleRejoin = () => {
-    try {
-      rejoinPlayer(session.id, player.id);
-    } catch (error) {
-      alert('Failed to rejoin player');
-    }
+  const handleQuickBuyIn = (amountCents: number) => {
+    recordBuyIn(session.id, player.id, amountCents);
   };
 
   return (
@@ -116,12 +110,12 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
         </div>
       </div>
 
-      {/* Quick buy-in buttons */}
+      {/* Quick buy-in buttons - Always show exactly 3 */}
       {session.status === 'open' && player.active && (
         <div className="quick-buyin-buttons">
-          {session.settings.quickBuyInOptions.map((amountCents) => (
+          {session.settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
             <button
-              key={amountCents}
+              key={index}
               className="btn btn-secondary btn-sm"
               onClick={() => handleQuickBuyIn(amountCents)}
             >
@@ -131,22 +125,19 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
         </div>
       )}
 
-      {/* Modals */}
-      {showBuyIn && (
-        <BuyInModal
-          session={session}
-          player={player}
-          onClose={() => setShowBuyIn(false)}
-        />
-      )}
+      <BuyInModal 
+        isOpen={showBuyIn}
+        onClose={() => setShowBuyIn(false)}
+        session={session}
+        player={player}
+      />
 
-      {showCashOut && (
-        <CashOutModal
-          session={session}
-          player={player}
-          onClose={() => setShowCashOut(false)}
-        />
-      )}
+      <CashOutModal 
+        isOpen={showCashOut}
+        onClose={() => setShowCashOut(false)}
+        session={session}
+        player={player}
+      />
     </div>
   );
 } 
