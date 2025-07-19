@@ -215,29 +215,21 @@ ${Math.abs(varianceCents) > 0 ? `\n⚠️ Variance: ${formatCurrency(varianceCen
                   const toPlayer = session.players[tx.toPlayerId];
                   return (
                     <div key={index} className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-danger text-white flex items-center justify-center text-sm font-bold">
+                          {fromPlayer.name.charAt(0)}
+                        </div>
                         <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-danger text-white flex items-center justify-center text-sm font-bold">
-                            {fromPlayer.name.charAt(0)}
-                          </div>
                           <span className="font-semibold">{fromPlayer.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-2xl text-primary">→</span>
-                          <span className="text-sm text-secondary">pays</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-10 h-10 rounded-full bg-success text-white flex items-center justify-center text-sm font-bold">
-                            {toPlayer.name.charAt(0)}
-                          </div>
+                          <span className="text-primary">→</span>
                           <span className="font-semibold">{toPlayer.name}</span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold text-primary text-xl">
+                        <div className="font-bold text-primary text-lg">
                           {formatCurrency(tx.amountCents, session.currency)}
                         </div>
-                        <div className="text-sm text-secondary">Transaction #{index + 1}</div>
+                        <div className="text-xs text-secondary">#{index + 1}</div>
                       </div>
                     </div>
                   );
