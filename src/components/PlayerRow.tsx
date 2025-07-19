@@ -11,7 +11,7 @@ interface PlayerRowProps {
 }
 
 export function PlayerRow({ session, player }: PlayerRowProps) {
-  const { recordBuyIn, cashOutPlayer, rejoinPlayer, undoLastBuyInForPlayer } = useStore();
+  const { recordBuyIn, cashOutPlayer, rejoinPlayer, undoLastBuyInForPlayer, settings } = useStore();
   const [showBuyIn, setShowBuyIn] = useState(false);
   const [showCashOut, setShowCashOut] = useState(false);
 
@@ -110,10 +110,10 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
         </div>
       </div>
 
-      {/* Quick buy-in buttons - Always show exactly 3 */}
+      {/* Quick buy-in buttons - Always show exactly 3 from global settings */}
       {session.status === 'open' && player.active && (
         <div className="quick-buyin-buttons">
-          {session.settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
+          {settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
             <button
               key={index}
               className="btn btn-secondary btn-sm"

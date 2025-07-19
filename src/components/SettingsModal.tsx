@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { useStore } from '../store';
 import { formatCurrency } from '../utils/currency';
 
@@ -10,6 +10,11 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings } = useStore();
   const [localSettings, setLocalSettings] = useState(settings);
+
+  // Sync localSettings with global settings when they change
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
 
   if (!isOpen) return null;
 

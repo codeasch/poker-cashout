@@ -11,7 +11,7 @@ interface BuyInModalProps {
 }
 
 export function BuyInModal({ isOpen, onClose, session, player }: BuyInModalProps) {
-  const { recordBuyIn } = useStore();
+  const { recordBuyIn, settings } = useStore();
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
 
@@ -72,11 +72,11 @@ export function BuyInModal({ isOpen, onClose, session, player }: BuyInModalProps
             {error && <div className="text-danger text-sm mt-1">{error}</div>}
           </div>
 
-          {/* Quick buy-in buttons - Always show exactly 3 */}
+          {/* Quick buy-in buttons - Always show exactly 3 from global settings */}
           <div className="form-group">
             <label className="form-label">Quick Options</label>
             <div className="flex gap-2 flex-wrap">
-              {session.settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
+              {settings.quickBuyInOptions.slice(0, 3).map((amountCents, index) => (
                 <button
                   key={index}
                   type="button"

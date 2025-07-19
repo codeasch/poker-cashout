@@ -7,15 +7,10 @@ interface AddPlayerModalProps {
   sessionId: string;
 }
 
-const PLAYER_COLORS = [
-  '#3B82F6', '#EF4444', '#10B981', '#F59E0B', '#8B5CF6',
-  '#06B6D4', '#F97316', '#EC4899', '#84CC16', '#6366F1'
-];
-
 export function AddPlayerModal({ isOpen, onClose, sessionId }: AddPlayerModalProps) {
   const { addPlayer } = useStore();
   const [playerName, setPlayerName] = useState('');
-  const [selectedColor, setSelectedColor] = useState(PLAYER_COLORS[0]);
+  const [selectedColor, setSelectedColor] = useState('#3B82F6');
 
   if (!isOpen) return null;
 
@@ -24,14 +19,14 @@ export function AddPlayerModal({ isOpen, onClose, sessionId }: AddPlayerModalPro
     if (playerName.trim()) {
       addPlayer(sessionId, playerName.trim(), selectedColor);
       setPlayerName('');
-      setSelectedColor(PLAYER_COLORS[0]);
+      setSelectedColor('#3B82F6');
       onClose();
     }
   };
 
   const handleCancel = () => {
     setPlayerName('');
-    setSelectedColor(PLAYER_COLORS[0]);
+    setSelectedColor('#3B82F6');
     onClose();
   };
 
@@ -59,19 +54,29 @@ export function AddPlayerModal({ isOpen, onClose, sessionId }: AddPlayerModalPro
 
           <div className="form-group">
             <label className="form-label">Player Color</label>
-            <div className="flex gap-2 flex-wrap">
-              {PLAYER_COLORS.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  className="w-8 h-8 rounded-full border-2"
-                  style={{ 
-                    backgroundColor: color,
-                    borderColor: selectedColor === color ? '#000' : 'transparent'
-                  }}
-                  onClick={() => setSelectedColor(color)}
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer"
+                style={{ backgroundColor: selectedColor }}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'color';
+                  input.value = selectedColor;
+                  input.onchange = (e) => {
+                    const target = e.target as HTMLInputElement;
+                    setSelectedColor(target.value);
+                  };
+                  input.click();
+                }}
+              />
+              <div className="flex-1">
+                <input
+                  type="color"
+                  className="w-full h-10 rounded border border-gray-300 cursor-pointer"
+                  value={selectedColor}
+                  onChange={(e) => setSelectedColor(e.currentTarget.value)}
                 />
-              ))}
+              </div>
             </div>
           </div>
 
