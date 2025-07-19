@@ -55,23 +55,31 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
 
   return (
     <div className="card">
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold">{player.name}</h4>
-            {getRejoinBadge()}
-            {getStatusBadge()}
-          </div>
-          <div className="text-sm text-secondary">
-            Buy-ins: {formatCurrency(totalBuyIns, session.currency)} • 
-            Cash-out: {formatCurrency(totalCashOuts, session.currency)} • 
-            Net: <span className={net >= 0 ? 'text-success' : 'text-danger'}>
-              {formatCurrency(Math.abs(net), session.currency)} {net >= 0 ? 'profit' : 'loss'}
-            </span>
+      <div className="player-row">
+        <div className="player-info">
+          {player.color && (
+            <div 
+              className="player-color" 
+              style={{ backgroundColor: player.color }}
+            />
+          )}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-semibold">{player.name}</h4>
+              {getRejoinBadge()}
+              {getStatusBadge()}
+            </div>
+            <div className="text-sm text-secondary">
+              Buy-ins: {formatCurrency(totalBuyIns, session.currency)} • 
+              Cash-out: {formatCurrency(totalCashOuts, session.currency)} • 
+              Net: <span className={net >= 0 ? 'text-success' : 'text-danger'}>
+                {formatCurrency(Math.abs(net), session.currency)} {net >= 0 ? 'profit' : 'loss'}
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="player-actions">
           {session.status === 'open' && player.active && (
             <>
               <button 
@@ -110,7 +118,7 @@ export function PlayerRow({ session, player }: PlayerRowProps) {
 
       {/* Quick buy-in buttons */}
       {session.status === 'open' && player.active && (
-        <div className="flex gap-2 flex-wrap">
+        <div className="quick-buyin-buttons">
           {session.settings.quickBuyInOptions.map((amountCents) => (
             <button
               key={amountCents}

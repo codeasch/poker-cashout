@@ -29,7 +29,7 @@ export function SessionView({ session }: SessionViewProps) {
   return (
     <div>
       {/* Header */}
-      <div className="flex justify-between items-center mb-4">
+      <div className="card-header mb-4">
         <div>
           <button 
             className="btn btn-secondary btn-sm mb-2"
@@ -37,24 +37,24 @@ export function SessionView({ session }: SessionViewProps) {
           >
             ← Back to Sessions
           </button>
-          <h2 className="text-2xl font-bold">{session.name}</h2>
-          <p className="text-secondary">
+          <h2 className="text-xl font-bold">{session.name}</h2>
+          <p className="text-secondary text-sm">
             Total Bank: {formatCurrency(totalBuyIns, session.currency)}
           </p>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {session.status === 'open' && (
             <>
               <button 
-                className="btn btn-primary"
+                className="btn btn-primary btn-sm"
                 onClick={() => setShowAddPlayer(true)}
               >
                 Add Player
               </button>
               {canEndGame && (
                 <button 
-                  className="btn btn-success"
+                  className="btn btn-success btn-sm"
                   onClick={() => setShowEndGame(true)}
                 >
                   End Game
@@ -64,7 +64,7 @@ export function SessionView({ session }: SessionViewProps) {
           )}
           {session.status === 'closed' && session.settlement && (
             <button 
-              className="btn btn-primary"
+              className="btn btn-primary btn-sm"
               onClick={() => setShowSettlement(true)}
             >
               View Settlement

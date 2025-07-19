@@ -56,7 +56,7 @@ body {
 .app-header {
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  padding: 1rem;
+  padding: 0.75rem 1rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -72,33 +72,34 @@ body {
 
 .app-title {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .app-main {
   flex: 1;
-  padding: 1rem;
+  padding: 0.75rem;
   max-width: 1200px;
   margin: 0 auto;
   width: 100%;
 }
 
-/* Buttons */
+/* Buttons - Mobile-first sizing */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.5rem;
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 0.5rem;
-  font-size: 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-height: 48px; /* Large tap targets for mobile */
+  min-height: 44px; /* Better mobile touch target */
+  white-space: nowrap;
 }
 
 .btn:disabled {
@@ -141,37 +142,39 @@ body {
 }
 
 .btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  min-height: 40px;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  min-height: 36px;
 }
 
 .btn-lg {
-  padding: 1rem 2rem;
-  font-size: 1.125rem;
-  min-height: 56px;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  min-height: 48px;
 }
 
-/* Cards */
+/* Cards - Mobile optimized */
 .card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: 0.75rem;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
   box-shadow: var(--shadow-sm);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .card-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -223,8 +226,8 @@ body {
 .modal {
   background-color: var(--bg-primary);
   border-radius: 0.75rem;
-  padding: 1.5rem;
-  max-width: 500px;
+  padding: 1.25rem;
+  max-width: 90vw;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -240,7 +243,7 @@ body {
 
 .modal-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
@@ -274,10 +277,12 @@ body {
 
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .justify-center { justify-content: center; }
 
+.gap-1 { gap: 0.25rem; }
 .gap-2 { gap: 0.5rem; }
 .gap-3 { gap: 0.75rem; }
 .gap-4 { gap: 1rem; }
@@ -285,32 +290,50 @@ body {
 /* Mobile-first responsive design */
 @media (max-width: 768px) {
   .app-header {
-    padding: 0.75rem;
+    padding: 0.5rem 0.75rem;
   }
   
   .app-title {
-    font-size: 1.25rem;
+    font-size: 1.125rem;
   }
   
   .app-main {
-    padding: 0.75rem;
+    padding: 0.5rem;
   }
   
   .card {
-    padding: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
   }
   
   .modal {
-    margin: 0.5rem;
+    margin: 0.25rem;
     padding: 1rem;
+  }
+  
+  .btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    min-height: 40px;
+  }
+  
+  .card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .card-header > div:last-child {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
 }
 
 /* Floating Action Button */
 .fab {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
+  bottom: 1.5rem;
+  right: 1.5rem;
   width: 56px;
   height: 56px;
   border-radius: 50%;
@@ -357,4 +380,66 @@ body {
 .badge-finished {
   background-color: var(--success-color);
   color: white;
+}
+
+/* Player color indicators */
+.player-color {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  border: 2px solid var(--bg-secondary);
+}
+
+/* Quick buy-in buttons - mobile optimized */
+.quick-buyin-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.quick-buyin-buttons .btn {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.5rem;
+}
+
+/* Player row improvements */
+.player-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.player-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.player-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.player-actions .btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+@media (min-width: 640px) {
+  .player-row {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  
+  .player-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
 } 

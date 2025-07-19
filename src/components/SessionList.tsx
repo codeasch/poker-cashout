@@ -17,10 +17,10 @@ export function SessionList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold">Sessions</h2>
+      <div className="card-header mb-4">
+        <h2 className="text-xl font-bold">Sessions</h2>
         <button 
-          className="btn btn-primary" 
+          className="btn btn-primary btn-sm" 
           onClick={() => setShowCreateModal(true)}
         >
           New Session
