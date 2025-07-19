@@ -34,20 +34,20 @@ export function SessionView({ sessionId, onBack }: SessionViewProps) {
     <div>
       {/* Header */}
       <div className="card-header mb-4">
-        <div>
+        <div className="flex-1 min-w-0">
           <button 
             className="btn btn-secondary btn-sm mb-2"
             onClick={onBack}
           >
-            ← Back to Sessions
+            ← Back
           </button>
-          <h2 className="text-xl font-bold">{session.name}</h2>
+          <h2 className="text-xl font-bold truncate">{session.name}</h2>
           <p className="text-secondary text-sm">
             Total Bank: {formatCurrency(totalBuyIns, session.currency)}
           </p>
         </div>
         
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap flex-shrink-0">
           {session.status === 'open' && (
             <>
               <button 
@@ -91,11 +91,27 @@ export function SessionView({ sessionId, onBack }: SessionViewProps) {
             </button>
           </div>
         ) : (
-          Object.values(session.players)
-            .sort((a, b) => a.order - b.order)
-            .map(player => (
-              <PlayerRow key={player.id} session={session} player={player} />
-            ))
+          <>
+            <div className="space-y-3">
+              {Object.values(session.players)
+                .sort((a, b) => a.order - b.order)
+                .map(player => (
+                  <PlayerRow key={player.id} session={session} player={player} />
+                ))}
+            </div>
+            
+            {/* Persistent Add Player Button */}
+            {session.status === 'open' && (
+              <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button 
+                  className="btn btn-primary w-full"
+                  onClick={() => setShowAddPlayer(true)}
+                >
+                  ➕ Add Player
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
 
