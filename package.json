@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Mobile-first static web app for managing live home poker game economics",
   "main": "index.html",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -20,7 +21,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@preact/preset-vite": "^2.10.2",
+    "@preact/preset-vite": "^2.8.0",
     "@types/node": "^20.0.0",
     "@vitest/ui": "^1.0.0",
     "typescript": "^5.0.0",

@@ -17,5 +17,8 @@ export default defineConfig({
     port: 3000,
     open: true
   },
-  base: './'
+  base: './',
+  optimizeDeps: {
+    include: ['preact', 'zustand']
+  }
 }) 
